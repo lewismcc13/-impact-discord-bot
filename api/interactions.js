@@ -13,9 +13,9 @@ export default async function handler(req,res){
  if(req.method!=="POST")return res.status(405).send("Method not allowed");
  const signature=req.headers["x-signature-ed25519"],timestamp=req.headers["x-signature-timestamp"],key=process.env.DISCORD_PUBLIC_KEY;
  // Discord signatures require the original request bytes, not re-serialized JSON.
- const raw=req.rawBody;
+ const raw=await new Promise((resolve,reject)=>{const chunks=[];req.on("data",chunk=>chunks.push(chunk));req.on("end",()=>resolve(Buffer.concat(chunks)));req.on("error",reject)});
  if(!signature||!timestamp||!key||!raw||!nacl.sign.detached.verify(Buffer.concat([Buffer.from(timestamp),Buffer.from(raw)]),Buffer.from(signature,"hex"),Buffer.from(key,"hex")))return res.status(401).send("Invalid signature");
- const i=req.body;if(i.type===1)return res.json({type:1});
+ let i;try{i=JSON.parse(raw.toString("utf8"))}catch{return res.status(400).send("Invalid JSON")};if(i.type===1)return res.json({type:1});
  const name=i.data?.name,id=i.member?.user?.id||i.user?.id,code=codes()[id];
  const opts=Object.fromEntries((i.data?.options||[]).map(o=>[o.name,o.value]));
  let message="";
